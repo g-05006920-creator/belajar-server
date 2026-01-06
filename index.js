@@ -1,5 +1,4 @@
 const express = require("express");
-const fetch = require("node-fetch");
 const { PDFDocument } = require("pdf-lib");
 
 const app = express();
@@ -19,17 +18,19 @@ app.post("/stamp", async (req, res) => {
       return res.status(400).send("Missing pdfUrl or sigUrl");
     }
 
-    // Ambil PDF dan tandatangan dari internet
-    const pdfBytes = await fetch(pdfUrl).then(r => r.arrayBuffer());
-    const sigBytes = await fetch(sigUrl).then(r => r.arrayBuffer());
+    // Node 18+ sudah ada fetch global
+    const pdfResponse = await fetch(pdfUrl);
+    const pdfBytes = await pdfResponse.arrayBuffer();
+
+    const sigResponse = await fetch(sigUrl);
+    const sigBytes = await sigResponse.arrayBuffer();
 
     // Load PDF ke memory (belum tampal tandatangan)
     const pdfDoc = await PDFDocument.load(pdfBytes);
 
-    // Simpan PDF asal semula → ini untuk uji POST request
+    // Simpan PDF asal semula → untuk test POST request
     const pdfBuffer = await pdfDoc.save();
 
-    // Hantar balik PDF
     res.setHeader("Content-Type", "application/pdf");
     res.send(Buffer.from(pdfBuffer));
 
