@@ -4,12 +4,12 @@ const { PDFDocument } = require("pdf-lib");
 const app = express();
 app.use(express.json({ limit: "20mb" })); // penting untuk PDF besar
 
-// Endpoint GET untuk test server hidup
+// GET test
 app.get("/", (req, res) => {
   res.send("Server hidup 🚀");
 });
 
-// Endpoint POST untuk terima PDF & tandatangan
+// POST /stamp untuk tampal tandatangan
 app.post("/stamp", async (req, res) => {
   try {
     const { pdfUrl, sigUrl } = req.body;
@@ -18,23 +18,33 @@ app.post("/stamp", async (req, res) => {
       return res.status(400).send("Missing pdfUrl or sigUrl");
     }
 
-    // Node 18+ sudah ada fetch global
-    const pdfResponse = await fetch(pdfUrl);
-    const pdfBytes = await pdfResponse.arrayBuffer();
+    // Ambil PDF + tandatangan dari internet
+    const pdfBytes = await (await fetch(pdfUrl)).arrayBuffer();
+    const sigBytes = await (await fetch(sigUrl)).arrayBuffer();
 
-    const sigResponse = await fetch(sigUrl);
-    const sigBytes = await sigResponse.arrayBuffer();
-
-    // Load PDF ke memory (belum tampal tandatangan)
+    // Load PDF
     const pdfDoc = await PDFDocument.load(pdfBytes);
+    const sigImage = await pdfDoc.embedPng(sigBytes);
 
-    // Simpan PDF asal semula → untuk test POST request
+    // Tampal tandatangan di **halaman terakhir**
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    lastPage.drawImage(sigImage, {
+      x: 50,    // koordinat kiri bawah
+      y: 50,
+      width: 150,
+      height: 75
+    });
+
+    // Simpan PDF baru
     const pdfBuffer = await pdfDoc.save();
 
+    // Hantar balik PDF baru
     res.setHeader("Content-Type", "application/pdf");
     res.send(Buffer.from(pdfBuffer));
 
   } catch (err) {
+    console.log(err);
     res.status(500).send(err.toString());
   }
 });
